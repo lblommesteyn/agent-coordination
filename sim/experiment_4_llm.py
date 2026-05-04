@@ -1,11 +1,11 @@
-"""Experiment 4 (LLM): real Gemini pipeline for representation format study.
+"""Experiment 4 (LLM): real Claude pipeline for representation format study.
 
 Topic: "impact of sleep on athletic performance", 7-task research DAG,
 three formats (prose / structured_json / compressed_summary).
 Returns a DataFrame compatible with experiment_4_representation().
 
 Usage:
-  export GEMINI_API_KEY=<your_key>
+  export ANTHROPIC_API_KEY=<your_key>
   python experiment_4_llm.py
 """
 
@@ -20,7 +20,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-import google.generativeai as genai
+import anthropic
 
 sys.path.insert(0, os.path.dirname(__file__))
 
@@ -134,23 +134,25 @@ Reply with a single decimal number only."""
 
 
 def _build_model(api_key=None):
-    key = api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    key = api_key or os.environ.get("ANTHROPIC_API_KEY")
     if not key:
-        raise ValueError("Set GEMINI_API_KEY or GOOGLE_API_KEY.")
-    genai.configure(api_key=key)
-    return genai.GenerativeModel(
-        "gemini-2.0-flash",
-        generation_config={"temperature": 0.2, "max_output_tokens": 1024},
-    )
+        raise ValueError("Set ANTHROPIC_API_KEY.")
+    return anthropic.Anthropic(api_key=key)
 
 
 def _call(model, prompt, max_retries=3, extra_cfg=None):
+    temperature = extra_cfg.get("temperature", 0.2) if extra_cfg else 0.2
+    max_tokens = extra_cfg.get("max_output_tokens", 1024) if extra_cfg else 1024
     for attempt in range(max_retries):
         try:
             t0 = time.time()
-            resp = (model.generate_content(prompt, generation_config=extra_cfg)
-                    if extra_cfg else model.generate_content(prompt))
-            return resp.text.strip(), time.time() - t0
+            resp = model.messages.create(
+                model="claude-haiku-4-5",
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.content[0].text.strip(), time.time() - t0
         except Exception:
             if attempt == max_retries - 1:
                 raise
