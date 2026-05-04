@@ -60,7 +60,7 @@ def experiment_1_cp_assignment(verbose: bool = True):
                 rng = np.random.RandomState(SEED + trial + n * 1000 + k * 100000)
                 dag = generate_random_dag(n, edge_prob=0.3, rng=rng)
                 agents = create_agents(k, rng=rng)
-                lb = compute_lower_bound_makespan(dag, k)
+                lb = compute_lower_bound_makespan(dag, k, agents)
 
                 for method_name, method_fn in methods.items():
                     if method_name == 'random':
@@ -188,7 +188,7 @@ def experiment_2_validator_placement(verbose: bool = True):
                 'rework_cost': rework,
             })
 
-            # Condition 3: optimal placement (argmax A_ij on CP)
+            # Condition 3: optimal placement (argmax prefix product on CP)
             opt_edge = optimal_validator_placement(dag, a_ij_values)
             validator_set = {opt_edge} if opt_edge else set()
             final_err = compute_final_error(dag, a_ij_values, validator_set, epsilon_0)

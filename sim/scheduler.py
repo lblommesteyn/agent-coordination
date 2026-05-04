@@ -400,12 +400,36 @@ class AdaptiveScheduler(StochasticScheduler):
 def optimal_validator_placement(
     dag: TaskDAG, a_ij: Dict[Tuple[int, int], float]
 ) -> Optional[Tuple[int, int]]:
-    """Find optimal single validator placement on the critical path."""
+    """Find optimal single validator placement on the critical path.
 
-    _, _, cp_edges = compute_critical_path(dag)
+    Under the multiplicative reset model, placing the validator after CP edge k
+    gives final_error = eps0 * prod(A_ij for edges after k).  Minimising this
+    is equivalent to maximising the prefix product prod(A_ij for edges up to k).
+    This is NOT generally the same as placing at argmax A_ij.
+    """
+    _, cp_tasks, cp_edges = compute_critical_path(dag)
     if not cp_edges:
         return None
-    return max(cp_edges, key=lambda edge: a_ij.get(edge, 1.0))
+
+    # Reconstruct CP edges in topological order using the ordered cp_tasks list
+    ordered_edges = [
+        (cp_tasks[i], cp_tasks[i + 1])
+        for i in range(len(cp_tasks) - 1)
+        if (cp_tasks[i], cp_tasks[i + 1]) in cp_edges
+    ]
+    if not ordered_edges:
+        return None
+
+    # Argmax of running prefix product
+    best_edge = ordered_edges[0]
+    best_prefix = a_ij.get(ordered_edges[0], 1.0)
+    running = best_prefix
+    for edge in ordered_edges[1:]:
+        running *= a_ij.get(edge, 1.0)
+        if running > best_prefix:
+            best_prefix = running
+            best_edge = edge
+    return best_edge
 
 
 def compute_final_error(

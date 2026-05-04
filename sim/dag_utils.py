@@ -288,11 +288,22 @@ def generate_research_pipeline_dag(rng: Optional[np.random.RandomState] = None) 
     return TaskDAG(tasks=tasks, edges=edges)
 
 
-def compute_lower_bound_makespan(dag: TaskDAG, num_agents: int) -> float:
+def compute_lower_bound_makespan(dag: TaskDAG, num_agents: int,
+                                  agents=None) -> float:
     """Compute a lower bound on makespan.
 
-    Lower bound = max(critical_path_length, total_work / num_agents).
+    With heterogeneous agents the CP-based bound uses the fastest agent's speed,
+    and the work-based bound divides by total capacity.  Both bounds are
+    necessary: the CP bound is tight when parallelism is low; the work bound is
+    tight when all agents are busy simultaneously.
     """
+    if agents:
+        max_speed = max(a.speed for a in agents)
+        total_speed = sum(a.speed for a in agents)
+    else:
+        max_speed = 1.0
+        total_speed = float(num_agents)
+
     cp_length, _, _ = compute_critical_path(dag)
     total_work = sum(t.duration for t in dag.tasks)
-    return max(cp_length, total_work / num_agents)
+    return max(cp_length / max_speed, total_work / total_speed)
