@@ -411,7 +411,14 @@ def optimal_validator_placement(
     if not cp_edges:
         return None
 
-    # Reconstruct CP edges in topological order using the ordered cp_tasks list
+    # Reconstruct CP edges in topological order using the ordered cp_tasks list.
+    # NOTE: this reconstruction assumes a unique (single-path) critical path,
+    # which holds for linear chains and DAGs where zero-slack tasks form a single
+    # chain.  For DAGs with multiple zero-slack branches converging at a node,
+    # cp_tasks may include tasks from different branches and consecutive pairs
+    # may not all be valid CP edges.  The cp_edges membership check below guards
+    # against false pairs, but the ordering may still be incomplete.  The theorem
+    # in Proposition 2 is stated for linear chains where this is exact.
     ordered_edges = [
         (cp_tasks[i], cp_tasks[i + 1])
         for i in range(len(cp_tasks) - 1)

@@ -242,38 +242,40 @@ def experiment_2_validator_placement(verbose: bool = True):
 
     df = pd.DataFrame(results)
 
-    # Plot 1: Box plot of final error per condition, stratified by chain length
-    fig, axes = plt.subplots(1, len(chain_lengths), figsize=(14, 5), sharey=False)
+    # Plot 1: Two-row figure — final error (top) and rework cost (bottom)
     condition_labels = {
         'no_validator': 'No Validator',
         'random_placement': 'Random',
         'optimal_placement': 'Optimal',
-        'two_validators': 'Two Validators',
+        'two_validators': 'Two Valid.',
     }
     palette = sns.color_palette('Set2', len(conditions))
 
+    fig, axes = plt.subplots(2, len(chain_lengths), figsize=(14, 8), sharey='row')
+
     for ax_idx, m in enumerate(chain_lengths):
-        ax = axes[ax_idx]
         df_m = df[df['chain_length'] == m]
+        plot_final = [df_m[df_m['condition'] == c]['final_error'].values for c in conditions]
+        plot_rework = [df_m[df_m['condition'] == c]['rework_cost'].values for c in conditions]
 
-        # Order conditions
-        plot_data = []
-        for cond in conditions:
-            cond_data = df_m[df_m['condition'] == cond]['final_error']
-            plot_data.append(cond_data.values)
+        for row, (ax, data, ylabel) in enumerate(zip(
+            [axes[0][ax_idx], axes[1][ax_idx]],
+            [plot_final, plot_rework],
+            ['Final Error ($\\epsilon_{\\mathrm{final}}$)', 'Rework Cost'],
+        )):
+            bp = ax.boxplot(data, patch_artist=True, showfliers=False,
+                            labels=[condition_labels[c] for c in conditions])
+            for patch, color in zip(bp['boxes'], palette):
+                patch.set_facecolor(color)
+                patch.set_alpha(0.7)
+            ax.tick_params(axis='x', rotation=45)
+            if ax_idx == 0:
+                ax.set_ylabel(ylabel)
+            if row == 0:
+                ax.set_title(f'm = {m} tasks')
 
-        bp = ax.boxplot(plot_data, patch_artist=True, showfliers=False,
-                       labels=[condition_labels[c] for c in conditions])
-        for patch, color in zip(bp['boxes'], palette):
-            patch.set_facecolor(color)
-            patch.set_alpha(0.7)
-
-        ax.set_title(f'm = {m} tasks')
-        ax.tick_params(axis='x', rotation=45)
-        if ax_idx == 0:
-            ax.set_ylabel('Final Error ($\\epsilon_{final}$)')
-
-    fig.suptitle('Experiment 2: Validator Placement — Final Error', fontsize=13)
+    fig.suptitle('Experiment 2: Validator Placement — Final Error (top) and Rework Cost (bottom)',
+                 fontsize=12)
     plt.tight_layout()
     fig.savefig(os.path.join(FIGURE_DIR, 'fig2_validator_error.pdf'), bbox_inches='tight')
     plt.close(fig)

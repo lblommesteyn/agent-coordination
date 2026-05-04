@@ -77,10 +77,12 @@ We optimize over four coupled variables:
 
 \subsection{Objective Function}
 
-\begin{equation}
+\begin{multline}
 \label{eq:objective}
-\min_{X, \pi, \mathcal{G}, R} \; \mathbb{E}_\pi\!\left[\text{makespan}\right] + \alpha \!\sum_{(i,j) \in \mathcal{G}}\! \text{OH}(a_{x_i} \!\to\! a_{x_j}, r_{ij}) + \beta \sum_i \epsilon_i
-\end{equation}
+\min_{X, \pi, \mathcal{G}, R} \; \mathbb{E}_\pi\!\left[\text{makespan}\right] \\
+  + \alpha \!\sum_{(i,j) \in \mathcal{G}}\! \text{OH}(a_{x_i} \!\to\! a_{x_j}, r_{ij})
+  + \beta \sum_i \epsilon_i
+\end{multline}
 
 where the three terms capture latency, coordination overhead, and accumulated error respectively. The weights $\alpha, \beta > 0$ trade off these objectives.
 
@@ -147,7 +149,7 @@ Placing a validator after edge $e_k$ resets the accumulated error to $\epsilon_0
 \[
 \epsilon_{\mathrm{final}}(k) = \epsilon_0 \prod_{j > k} A_{e_j}.
 \]
-Since $\prod_{j=1}^m A_{e_j}$ is fixed for a given episode, minimizing $\epsilon_{\mathrm{final}}(k)$ over $k$ is equivalent to maximizing the prefix product $P_k = \prod_{j=1}^{k} A_{e_j}$. The optimal placement is therefore at the edge after which this running product is largest, i.e., $k^* = \arg\max_k \sum_{j=1}^{k} \log A_{e_j}$ (maximum prefix sum of log-amplifications), which is the standard maximum-subarray prefix problem on the sequence $(\log A_{e_1}, \ldots, \log A_{e_{m-1}})$. We restrict $k$ to interior edges ($k < m-1$) to ensure at least one post-validator edge exists; the validator on the final output edge would give trivially optimal final error $\epsilon_0$ with no downstream benefit. This criterion is generally \emph{not} the same as placing at $\arg\max_j A_{e_j}$: the argmax-single-factor heuristic ignores cumulative amplification from earlier edges and is optimal only when the sequence is non-decreasing, which does not hold for random amplification factors.
+Since $\prod_{j=1}^m A_{e_j}$ is fixed for a given episode, minimizing $\epsilon_{\mathrm{final}}(k)$ over $k$ is equivalent to maximizing the prefix product $P_k = \prod_{j=1}^{k} A_{e_j}$. The optimal placement is therefore at the edge after which this running product is largest, i.e., $k^* = \arg\max_k \sum_{j=1}^{k} \log A_{e_j}$ (maximum prefix sum of log-amplifications), which is the standard maximum-subarray prefix problem on the sequence $(\log A_{e_1}, \ldots, \log A_{e_{m-1}})$. We restrict $k$ to interior edges ($k \leq m-1$, i.e., not the final output edge) to ensure at least one post-validator edge exists; the validator on the final output edge would give trivially optimal final error $\epsilon_0$ with no downstream benefit. This criterion is generally \emph{not} the same as placing at $\arg\max_j A_{e_j}$: the argmax-single-factor heuristic ignores cumulative amplification from earlier edges and can coincide with the prefix-product optimum only in special cases, e.g., when the sequence has a single dominant peak with all other factors close to 1.
 \end{proof}
 
 \begin{proposition}[Optimal Agent Count]
@@ -212,8 +214,8 @@ Rearranging the condition $C_{\mathrm{spec}} < B$ gives the stated threshold.
 
 We formulate the orchestration as a Markov Decision Process:
 \begin{itemize}
-    \item \textbf{State}: $s_t = (\text{completed tasks}, \text{current outputs}, \{\epsilon_i\}, \text{remaining DAG})$
-    \item \textbf{Action}: reactive decisions (assignment, representation, validation) plus optional proactive controls (speculate, stop, skip, prewarm)
+    \item \textbf{State}: $s_t = (\mathcal{D},\, o_{\mathcal{D}},\, \{\epsilon_i\},\, \mathcal{T}')$ where $\mathcal{D}$ = done tasks, $\mathcal{T}'$ = residual DAG
+    \item \textbf{Action}: reactive (assign, represent, validate) or proactive (speculate, stop, skip, prewarm)
     \item \textbf{Reward}: $r_t = -(\Delta\text{makespan} + \alpha \cdot \text{overhead}_t + \beta \cdot \epsilon_t)$
 \end{itemize}
 
@@ -314,7 +316,7 @@ All stochastic execution experiments use an event-driven ready queue rather than
 \begin{figure}[t]
     \centering
     \includegraphics[width=\columnwidth]{figures/fig2_validator_error.pdf}
-    \caption{Experiment 2: Final error distribution by validator strategy, stratified by chain length.}
+    \caption{Experiment 2: Final error (top row) and rework cost (bottom row) by validator strategy, stratified by chain length. Optimal and two-validator conditions are identical on final error; two validators reduce rework cost by 51--80\% at $m \geq 7$.}
     \label{fig:exp2}
 \end{figure}
 
