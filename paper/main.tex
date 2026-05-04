@@ -344,6 +344,23 @@ All stochastic execution experiments use an event-driven ready queue rather than
     \label{fig:exp4}
 \end{figure}
 
+\subsection{Experiment 4b: LLM Empirical Validation of Representation Effects}
+
+\paragraph{Setup.}
+To ground the simulation results in real LLM behavior, we instantiate the same 7-task research pipeline DAG using the Anthropic Claude API (\texttt{claude-haiku-4-5}). The topic is \textit{``impact of sleep on athletic performance''}; tasks span literature review, data collection, problem framing, method design, implementation, evaluation, and paper writing. Each task prompt is prepended with the chosen format instruction (prose, structured JSON, or compressed bullet points) and dependent predecessor outputs are passed as context. Handoff quality is scored by a separate LLM judge call that returns $A_{ij} \in [0, 2]$ per directed edge; 1.0 indicates no change, below 1 indicates synthesis gain, above 1 indicates information loss.
+
+\paragraph{Results (Figure~\ref{fig:exp4b}).}
+Across the seven handoff edges, mean measured $A_{ij}$ values are 1.00 for prose, 1.20 for structured JSON, and 1.17 for compressed summary. Counterintuitively, prose achieves the lowest total cost (37.2 vs.\ 44.0 for both structured formats), driven primarily by faster generation latency: prose tasks complete in 5--8 s per step versus 8--10 s for constrained formats. However, prose also exhibits higher variance in $A_{ij}$---two handoffs score 0.3 (strong synthesis) while three score 1.3 (moderate loss), compared with the more uniform degradation profile of the other formats. On the critical path edges (Problem Framing $\to$ Method Design $\to$ Implementation $\to$ Evaluation $\to$ Paper Writing), the cumulative error products are 0.61, 1.76, and 2.43 for prose, structured JSON, and compressed summary respectively, suggesting that in this topic and model setting, prose can promote synthesis at certain boundaries while structured formats impose more consistent but moderately amplifying constraints.
+
+These results carry two lessons for practitioners. First, representation format has a measurable and non-trivial effect on both latency and information fidelity in real LLM pipelines, consistent with Experiment~4's simulation prediction that format is a first-order optimization variable. Second, the relative ranking depends on topic and model: in settings where the base $A_{ij}$ is near 1.0 (as here), the latency component dominates and a lower-overhead format can win even if its error multiplier is slightly higher. At higher base amplification---as observed in the simulation sweep---structured JSON's multiplicative advantage grows and its cost ranking improves.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\columnwidth]{figures/fig4_representation_llm.pdf}
+    \caption{Experiment 4b: Measured $A_{ij}$ per handoff (left), task latency per format (center), and total cost breakdown (right) on a real 7-task Claude pipeline. Prose is fastest but exhibits higher $A_{ij}$ variance; structured JSON is most consistent.}
+    \label{fig:exp4b}
+\end{figure}
+
 \subsection{Experiment 5: Adaptive vs.\ Static Policy}
 
 \paragraph{Setup.} Stochastic execution of the 7-task DAG over 1000 episodes. Durations follow $d_i \cdot \text{LogNormal}(0, 0.3)$. Tasks fail with probability $p_i$, doubling duration and resetting output. Amplification factors drift as $A_{ij}^{(t+1)} = A_{ij}^{(t)} + \mathcal{N}(0, 0.3)$, and we evaluate total cost in a coordination-aware regime with $(\alpha, \beta, \gamma) = (1.5, 1.0, 1.5)$.
