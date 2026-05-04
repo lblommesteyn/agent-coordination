@@ -135,11 +135,11 @@ This is a stylized slack-preserving exchange argument rather than a worst-case a
 
 \begin{proposition}[Optimal Validator Placement on a Linear Chain]
 \label{prop:validator}
-Given a single validator to place on a linear critical-path chain with edges $e_1, \ldots, e_m$ (in execution order), the optimal position is at the edge $e_{k^*}$ where:
+Given a single validator to place on a linear critical-path chain with edges $e_1, \ldots, e_m$ (in execution order), and restricting to interior positions $k \in \{1, \ldots, m{-}1\}$ so that at least one post-validator edge remains, the optimal position is at the edge $e_{k^*}$ where:
 \begin{equation}
-    k^* = \arg\max_{k \in \{1,\ldots,m\}} \prod_{j=1}^{k} A_{e_j}.
+    k^* = \arg\max_{k \in \{1,\ldots,m-1\}} \prod_{j=1}^{k} A_{e_j}.
 \end{equation}
-This minimizes the post-validator final error $\epsilon_{\textup{final}}$.
+This minimizes the post-validator final error $\epsilon_{\textup{final}} = \epsilon_0 \prod_{j > k^*} A_{e_j}$.
 \end{proposition}
 
 \begin{proof}
@@ -147,7 +147,7 @@ Placing a validator after edge $e_k$ resets the accumulated error to $\epsilon_0
 \[
 \epsilon_{\mathrm{final}}(k) = \epsilon_0 \prod_{j > k} A_{e_j}.
 \]
-Since $\prod_{j=1}^m A_{e_j}$ is fixed for a given episode, minimizing $\epsilon_{\mathrm{final}}(k)$ over $k$ is equivalent to maximizing the prefix product $P_k = \prod_{j=1}^{k} A_{e_j}$. The optimal placement is therefore at the edge after which this running product is largest. Note that the prefix product increases when $A_{e_{k+1}} > 1$ and decreases when $A_{e_{k+1}} < 1$, so the maximum occurs at the last edge in the longest uninterrupted run of amplifying ($A > 1$) edges. This is generally \emph{not} the same as the single edge with the largest amplification factor, $\arg\max_j A_{e_j}$: the argmax heuristic is optimal only in the special case where amplification factors are non-decreasing along the chain, which does not hold in general.
+Since $\prod_{j=1}^m A_{e_j}$ is fixed for a given episode, minimizing $\epsilon_{\mathrm{final}}(k)$ over $k$ is equivalent to maximizing the prefix product $P_k = \prod_{j=1}^{k} A_{e_j}$. The optimal placement is therefore at the edge after which this running product is largest, i.e., $k^* = \arg\max_k \sum_{j=1}^{k} \log A_{e_j}$ (maximum prefix sum of log-amplifications), which is the standard maximum-subarray prefix problem on the sequence $(\log A_{e_1}, \ldots, \log A_{e_{m-1}})$. We restrict $k$ to interior edges ($k < m-1$) to ensure at least one post-validator edge exists; the validator on the final output edge would give trivially optimal final error $\epsilon_0$ with no downstream benefit. This criterion is generally \emph{not} the same as placing at $\arg\max_j A_{e_j}$: the argmax-single-factor heuristic ignores cumulative amplification from earlier edges and is optimal only when the sequence is non-decreasing, which does not hold for random amplification factors.
 \end{proof}
 
 \begin{proposition}[Optimal Agent Count]
@@ -294,7 +294,7 @@ All stochastic execution experiments use an event-driven ready queue rather than
 
 \paragraph{Metric.} Normalized makespan = actual makespan / lower bound, where the lower bound is $\max(\text{CP length} / s_{\max},\; \text{total work} / \sum_k s_k)$, with $s_{\max}$ the fastest agent speed and $\sum_k s_k$ the total agent capacity. Both terms are necessary: the CP term is tight when parallelism is low; the work term is tight when all agents are busy simultaneously.
 
-\paragraph{Results (Figure~\ref{fig:exp1}).} CP-first assignment achieves normalized makespan 0.80--0.98 across all configurations, beating round-robin by 11--20\% and random by 24--28\%. The advantage persists as task count increases, indicating that prioritizing the critical path remains beneficial even as the DAG exposes more parallel slack. CP-first with bundling achieves nearly identical makespan to CP-first while modestly reducing handoffs (not shown), confirming Proposition~\ref{prop:cpfirst}.
+\paragraph{Results (Figure~\ref{fig:exp1}).} CP-first assignment achieves normalized makespan 1.04--1.24 across all configurations (all $\geq 1.0$, consistent with the corrected speed-aware lower bound), beating round-robin by 12--20\% and random by 25--28\%. The proportional advantage narrows as task count grows ($n=5$: 20\% over round-robin; $n=50$: 12\%), because larger DAGs expose more parallel slack and give all policies more opportunities to avoid the critical path. CP-first with bundling achieves nearly identical makespan (1.05--1.26), confirming Proposition~\ref{prop:cpfirst}.
 
 \begin{figure}[t]
     \centering
@@ -307,9 +307,9 @@ All stochastic execution experiments use an event-driven ready queue rather than
 
 \paragraph{Setup.} Linear chains of length $m \in \{3, 5, 7, 10\}$ (worst case for error compounding). Amplification factors $A_{ij} \sim \text{LogNormal}(\mu, \sigma)$ with mean 1.5 and standard deviation 0.5. Initial error $\epsilon_0 = 0.1$. 500 trials per configuration.
 
-\paragraph{Conditions.} No validator, random placement, optimal placement (argmax prefix product on CP), and two validators (top-2 prefix-product positions).
+\paragraph{Conditions.} No validator, random placement, optimal single-validator placement (argmax interior prefix product), and two validators: $k_2$ = single-validator optimum, $k_1$ = prefix-product optimum in the sub-chain before $k_2$ (minimising rework in the prefix without changing final error).
 
-\paragraph{Results (Figure~\ref{fig:exp2}).} Without validation, mean final error grows from 0.23 ($m=3$) to 3.84 ($m=10$), confirming exponential accumulation per Proposition~\ref{prop:error}. Optimal single-validator placement reduces final error by 50--85\% versus no validator and outperforms random placement by 20--50\%, confirming Proposition~\ref{prop:validator}. Two validators further reduce error to near-$\epsilon_0$ levels.
+\paragraph{Results (Figure~\ref{fig:exp2}).} Without validation, mean final error grows from 0.23 ($m=3$) to 3.84 ($m=10$), consistent with exponential accumulation (Proposition~\ref{prop:error}). Optimal single-validator placement (argmax interior prefix product) stabilizes final error to approximately 0.15 across all chain lengths---a 34\% reduction at $m=3$ growing to 96\% at $m=10$---because the prefix-product-maximizing interior position consistently leaves only the last CP edge in the post-validator suffix. For $m\geq 5$, optimal outperforms interior random placement by 38--82\% on final error (at $m=3$ both pick the only interior candidate). Two validators place $k_2$ at the single-validator optimum, yielding identical final error; their distinct benefit is in rework cost, which falls 80\% at $m=7$ and 51\% at $m=10$ relative to one validator. Note that optimal single-validator placement minimises final error but not rework, since it always places near the end of the chain; earlier or distributed placement (including random) can intercept more intermediate high-error tasks at the cost of a higher final error.
 
 \begin{figure}[t]
     \centering

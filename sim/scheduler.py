@@ -420,11 +420,17 @@ def optimal_validator_placement(
     if not ordered_edges:
         return None
 
-    # Argmax of running prefix product
-    best_edge = ordered_edges[0]
-    best_prefix = a_ij.get(ordered_edges[0], 1.0)
+    # Constrain to interior CP edges: the validator must be placed before the
+    # final CP task so that at least one post-validator edge exists to benefit.
+    # Placing at the last CP edge gives final_error = eps_0 trivially (no
+    # downstream CP tasks), which is degenerate when all A_ij > 1.
+    candidates = ordered_edges[:-1] if len(ordered_edges) > 1 else ordered_edges
+
+    # Argmax of running prefix product over interior candidates
+    best_edge = candidates[0]
+    best_prefix = a_ij.get(candidates[0], 1.0)
     running = best_prefix
-    for edge in ordered_edges[1:]:
+    for edge in candidates[1:]:
         running *= a_ij.get(edge, 1.0)
         if running > best_prefix:
             best_prefix = running

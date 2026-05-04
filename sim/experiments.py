@@ -175,9 +175,11 @@ def experiment_2_validator_placement(verbose: bool = True):
                 'rework_cost': rework,
             })
 
-            # Condition 2: random validator placement
-            random_edge_idx = rng.randint(0, len(edges))
-            random_edge = edges[random_edge_idx]
+            # Condition 2: random validator placement (interior edges only,
+            # consistent with the interior-edge constraint on optimal placement)
+            interior_edges = edges[:-1] if len(edges) > 1 else edges
+            random_edge_idx = rng.randint(0, len(interior_edges))
+            random_edge = interior_edges[random_edge_idx]
             final_err = compute_final_error(dag, a_ij_values, {random_edge}, epsilon_0)
             rework = sum(dag.get_task(i).duration for i in range(m)
                         if _compute_task_error(dag, a_ij_values, {random_edge}, epsilon_0, i) > error_threshold)
@@ -201,9 +203,33 @@ def experiment_2_validator_placement(verbose: bool = True):
                 'rework_cost': rework,
             })
 
-            # Condition 4: two validators at top-2 A_ij edges
-            sorted_edges = sorted(edges, key=lambda e: a_ij_values.get(e, 1.0), reverse=True)
-            two_val = set(sorted_edges[:2])
+            # Condition 4: two validators at top-2 interior prefix-product positions.
+            # Under the reset model, final_error depends only on the last validator
+            # position (k2); k1 reduces rework in the prefix but not final error.
+            # We select k2 = single-validator optimum, k1 = prefix-product optimum
+            # in the sub-chain before k2.
+            topo_lin = dag.topological_sort()
+            _, cp_tasks_lin, cp_edges_lin = compute_critical_path(dag)
+            oe = [
+                (cp_tasks_lin[i], cp_tasks_lin[i + 1])
+                for i in range(len(cp_tasks_lin) - 1)
+                if (cp_tasks_lin[i], cp_tasks_lin[i + 1]) in cp_edges_lin
+            ]
+            # Interior edges only (same constraint as single-validator)
+            interior = oe[:-1] if len(oe) > 1 else oe
+            k2_edge = opt_edge  # already the prefix-product optimum
+            k2_idx = interior.index(k2_edge) if k2_edge in interior else len(interior) - 1
+            # k1: prefix-product optimum in the sub-chain before k2
+            k1_edge = None
+            if k2_idx > 0:
+                prefix_before = interior[:k2_idx]
+                best_pf, running_pf = a_ij_values.get(prefix_before[0], 1.0), a_ij_values.get(prefix_before[0], 1.0)
+                k1_edge = prefix_before[0]
+                for e in prefix_before[1:]:
+                    running_pf *= a_ij_values.get(e, 1.0)
+                    if running_pf > best_pf:
+                        best_pf, k1_edge = running_pf, e
+            two_val = {k2_edge} if k1_edge is None else {k1_edge, k2_edge}
             final_err = compute_final_error(dag, a_ij_values, two_val, epsilon_0)
             rework = sum(dag.get_task(i).duration for i in range(m)
                         if _compute_task_error(dag, a_ij_values, two_val, epsilon_0, i) > error_threshold)
